@@ -43,6 +43,16 @@ SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further detail
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.5 s - in eu.docker.postgres.PostgresContainerTest
 ```
 
+The above mentioned test spawns two containers:
+
+```
+➜  ~ docker ps
+CONTAINER ID        IMAGE                               COMMAND                  CREATED             STATUS              PORTS                     NAMES
+44786704c442        postgres:9.6.8                      "docker-entrypoint.s…"   2 seconds ago       Up 1 second         0.0.0.0:32799->5432/tcp   boring_lamarr
+644c74ed0cec        quay.io/testcontainers/ryuk:0.2.2   "/app"                   2 seconds ago       Up 1 second         0.0.0.0:32798->8080/tcp   testcontainers-ryuk-00894707-a42f-4ce3-a064-e9d8a6ceea0c
+```
+
+
 ## Dockerized builds
 
 Probably a common question when looking at this project would be why bother
@@ -61,143 +71,103 @@ TLDR; build an image with the dependencies for the project (java, maven, etc.)
 Building the image is done by executing the following statement:
 
 ```
-docker build -f docker/Dockerfile -t marius/dockerized-maven-jdk11 .
-```
-
-Once the image is built, we can proceed to build the source code
-by referencing the volumes:
-- project
-- repository (m2)
-
-
-```
-docker run -it \
-           --rm  \
-           -v $(pwd):/project \
-           -v $(echo "$HOME/.m2/repository"):/repository \
-           marius/dockerized-maven-jdk11 mvn clean compile
+docker build -f docker/Dockerfile -t marius/dockerized-maven-jdk11 dockerHost=tcp://my.docker.host:2375 .
 ```
 
 
-When executing the command mentioned above, the source files of the project
-will be successfully compiled.
+The `dockerHost` build argument referenced in the command above is located on another machine in my scenario (not the same machine as the one where the docker build is performed). 
+
+When building the image, I've struggled with enabling ryuk, so in a first phase I've disabled it through
 
 ```
-[INFO] --- maven-compiler-plugin:3.8.0:compile (default-compile) @ dockerized-maven-build ---
-[INFO] Changes detected - recompiling the module!
-[WARNING] File encoding has not been set, using platform encoding UTF-8, i.e. build is platform dependent!
-[INFO] Compiling 1 source file to /project/target/classes
+ENV TESTCONTAINERS_RYUK_DISABLED="true"
+```
+
+
+By doing this, the building of the image succeeds.
+
+
+```
+➜  dockerized-maven-build git:(master) ✗ docker build -f docker/Dockerfile -t marius/dockerized-maven-jdk11 --build-arg dockerHost=tcp://my.docker.host:2375 .
+
+....
+
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.3 s - in eu.docker.postgres.PostgresContainerTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
-[INFO] Total time:  2.250 s
-```
-
-
-In case of the showcased project however (because a Postgres docker container is spawned for 
-test purposes) this approach needs still to be tweaked in order to point to the container 
-building the source code how to communicated with the docker daemon for 
-spawning a new container (Postgres). 
-
-https://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/
-
-```
-This looks like Docker-in-Docker, feels like Docker-in-Docker, but it's not Docker-in-Docker: 
-when this container will create more containers, those containers will be created in the 
-top-level Docker. 
-
-You will not experience nesting side effects, and the build cache will be 
-shared across multiple invocations.
-```
-
-
-After adding the UNIX docker socket volume and the `DOCKER_HOST` variable (needed
-in the initialization of the testcontainers library when running from within a container)
-the project builds successfully
-
-```
-docker run -it \
-           --rm  \
-           -e DOCKER_HOST=unix:///var/run/docker.sock \
-           -v /var/run/docker.sock:/var/run/docker.sock \           
-           -v $(pwd):/project \
-           -v $(echo "$HOME/.m2/repository"):/repository \
-           marius/dockerized-maven-jdk11 mvn clean compile
-```
-
-
-
-
-```
-[INFO] -------------------------------------------------------
-[INFO]  T E S T S
-[INFO] -------------------------------------------------------
-[INFO] Running eu.docker.postgres.PostgresContainerTest
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-        ℹ︎ Checking the system...
-        ✔ Docker version should be at least 1.6.0
-        ✔ Docker environment should have more than 2GB free disk space
-[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.596 s - in eu.docker.postgres.PostgresContainerTest
+[INFO] Total time:  10.703 s
+[INFO] Finished at: 2019-02-26T06:26:48Z
+[INFO] ------------------------------------------------------------------------
+Removing intermediate container 862135fb53e6
+ ---> 751ca9bfb34f
+Successfully built 751ca9bfb34f
+Successfully tagged marius/dockerized-maven-jdk11:latest
 
 ```
 
-However, there is a drawback - the `target` folder belongs to the `root:root` user:
+
+When using `ryuk` for test purposes, by commenting the `Dockerfile` line
 
 ```
-➜  dockerized-maven-build git:(master) ✗ ls -la
+#ENV TESTCONTAINERS_RYUK_DISABLED="true"
+``` 
+
+the build fails with the following exception:
+
+```
 ...
--rw-r--r--  1 marius marius 5211 Feb  8 13:38 readme.md
-drwxr-xr-x  4 marius marius 4096 Feb  8 13:09 src
-drwxr-xr-x  8 root   root   4096 Feb  8 13:36 target
 
-```
+2019-02-25 16:06:46 WARN  ResourceReaper:137 - Can not connect to Ryuk at my.docker.host:32866
+java.net.ConnectException: Connection refused (Connection refused)
+	at java.base/java.net.PlainSocketImpl.socketConnect(Native Method)
+	at java.base/java.net.AbstractPlainSocketImpl.doConnect(AbstractPlainSocketImpl.java:399)
+	at java.base/java.net.AbstractPlainSocketImpl.connectToAddress(AbstractPlainSocketImpl.java:242)
+	at java.base/java.net.AbstractPlainSocketImpl.connect(AbstractPlainSocketImpl.java:224)
+	at java.base/java.net.SocksSocketImpl.connect(SocksSocketImpl.java:403)
+	at java.base/java.net.Socket.connect(Socket.java:591)
+	at java.base/java.net.Socket.connect(Socket.java:540)
+	at java.base/java.net.Socket.<init>(Socket.java:436)
+	at java.base/java.net.Socket.<init>(Socket.java:213)
+	at org.testcontainers.utility.ResourceReaper.lambda$start$1(ResourceReaper.java:112)
+	at java.base/java.lang.Thread.run(Thread.java:834)
 
-Doing things in this manner has the drawback that the `target` file is not writable anymore
-by the logged in user `marius` when doing from the command line build (or when changing 
-in the IDE a file and compile afterwards the project).
-
-In order to solve this problem, the docker container needs to be executed as a non root user.
-
-https://medium.com/redbubble/running-a-docker-container-as-a-non-root-user-7d2e00f8ee15
-
-It must be noted here that in order to be able to spawn the postgres testcontainers instance, 
-the user group specified must be the same as the `docker` user group from the host machine.
-
-Retrieve the logged-in user and the docker group to which it is assigned:
-```
---user $(id -u):$(cut -d: -f3 < <(getent group docker)) \
-```
-
-The modified `docker run` command looks now like this:
-
-```
-docker run -it \
-           --rm  \
-           --user $(id -u):$(cut -d: -f3 < <(getent group docker)) \           
-           -e DOCKER_HOST=unix:///var/run/docker.sock \
-           -v /var/run/docker.sock:/var/run/docker.sock \           
-           -v $(pwd):/project \
-           -v $(echo "$HOME/.m2/repository"):/repository \
-           marius/dockerized-maven-jdk11 mvn clean compile
-```
-
-
-As you can see from the listing below, the `target` folder belongs now to
-the user `marius` (and its `docker` group).
-
-```
-➜  dockerized-maven-build git:(master) ✗ ls -la
+	
 ...
-drwxr-xr-x  4 marius marius 4096 Feb  8 13:09  src
-drwxr-xr-x  8 marius docker 4096 Feb  8 13:47  target
+...
+	
+[ERROR] Errors: 
+[ERROR]   PostgresContainerTest » ExceptionInInitializer
+[INFO] 
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  35.332 s
+[INFO] Finished at: 2019-02-26T06:30:36Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.0.0-M3:test (default-test) on project dockerized-maven-build: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /project/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+The command '/bin/sh -c mvn clean test' returned a non-zero code: 1
+
 ```
 
-By doing this series of steps in your project, you can have a completely dockerized maven build
-with the advantage that it can spawn other containers for test purposes.
+This showcase is meant to share more light on the comments i've made here:
 
-Obviously this is a proof of concept and there are very likely some other limitations when working
-with a more complex project, but this could be good start when thinking about containerized builds.
+https://github.com/testcontainers/testcontainers-java/pull/1181
 
-Feedback is welcome.
