@@ -23,7 +23,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 public class PostgresContainerComposeTest {
 
   static DockerComposeContainer environment =   new DockerComposeContainer(new File("src/test/resources/compose-test.yml"))
-          .withExposedService("db", 5432, Wait.forListeningPort());
+          .withExposedService("db", 5432, Wait.forListeningPort()).withLocalCompose(true);;
   @BeforeAll
   static void startUp() {
     environment.start();
