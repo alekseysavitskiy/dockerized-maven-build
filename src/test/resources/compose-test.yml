@@ -13,5 +13,14 @@ services:
       POSTGRES_PASSWORD: opsops
       PGDATA: /var/lib/postgresql/data/pgdata
 
+  mongodb:
+    image: 069192305883.dkr.ecr.eu-central-1.amazonaws.com/iotahoe/mongodb:latest
+
+    environment: 
+      MONGO_USERNAME: ops
+      MONGO_PASSWORD: opsops
+      MONGO_DB: ops
+    command: mongod --wiredTigerCacheSizeGB 0.5 --storageEngine "wiredTiger" --replSet "rs0"
+
 volumes:
   db_pgdata: {}
