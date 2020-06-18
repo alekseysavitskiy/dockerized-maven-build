@@ -13,7 +13,7 @@ ENV PATH="$PATH:/maven/bin"
 ENV DOCKER_HOST=tcp://localhost:2376
 ENV DOCKER_CERT_PATH=/project/certs
 ENV DOCKER_TLS_VERIFY=1
-ENV TESTCONTAINERS_RYUK_DISABLED="true"
+ENV TESTCONTAINERS_RYUK_DISABLED="false"
 ENV DOCKER_CONFIG_FILE=/project/config.json
 
 # Override the m2 settings in order to point to the host machine's m2 repo
