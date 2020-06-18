@@ -1,0 +1,48 @@
+# Docker
+# Build a Docker image 
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+  batch: true
+  branches:
+    include:
+    - master
+    - releases/*
+  paths:
+    exclude:
+    - "*.md"
+
+pr:
+  branches:
+    include:
+    - master
+    - releases/*
+  paths:
+    exclude:
+    - "*.md"
+    
+resources:
+- repo: self
+
+variables:
+  tag: '$(Build.SourceBranchName)-$(Build.BuildNumber)'
+  imageName: '$(Build.Repository.Name)'
+
+stages:
+- stage: BuildOPS
+  displayName: Build ops server image
+  jobs:  
+  - job: Build
+    displayName: Build ops server
+    pool:
+      name: EKS-halo-dev
+    steps:
+    - bash: env
+    - task: Bash@3
+      displayName: Run tests
+      inputs:
+        targetType: 'inline'
+        script: |
+          cp -r /certs/client ./certs
+          cp ~/.docker/config.json ./config.json 
+          docker build  -f docker/Dockerfile .
