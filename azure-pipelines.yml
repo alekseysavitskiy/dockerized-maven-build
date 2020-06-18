@@ -45,4 +45,4 @@ stages:
         script: |
           cp -r /certs/client ./certs
           cp ~/.docker/config.json ./config.json 
-          docker build  --network=host -f docker/Dockerfile .
+          docker build -f docker/Dockerfile .
