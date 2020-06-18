@@ -5,7 +5,7 @@ ARG dockerHost
 # Install maven
 WORKDIR /
 ENV MAVEN_VERSION="3.6.0"
-RUN curl "https://www-eu.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" --output maven.tar.gz \
+RUN curl "https://apache.volia.net/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" --output maven.tar.gz \
     && tar -xzf 'maven.tar.gz' \
     && ln -s apache-maven-${MAVEN_VERSION} maven
 ENV PATH="$PATH:/maven/bin"
