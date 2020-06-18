@@ -1,3 +1,5 @@
+# syntax = docker/dockerfile:1.1.5-experimental
+
 FROM openjdk:11-jdk
 
 ARG dockerHost
@@ -17,7 +19,7 @@ ENV DOCKER_HOST=tcp://localhost:2376
 ENV DOCKER_CERT_PATH=/project/certs
 ENV DOCKER_TLS_VERIFY=1
 ENV TESTCONTAINERS_RYUK_DISABLED="false"
-ENV DOCKER_CONFIG_FILE=/project/config.json
+ENV DOCKER_CONFIG=/project/config.json
 
 
 WORKDIR /project
