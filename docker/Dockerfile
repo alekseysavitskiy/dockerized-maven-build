@@ -25,4 +25,4 @@ ENV DOCKER_CONFIG=/project
 
 WORKDIR /project
 COPY . ./
-RUN mvn clean test
+RUN --mount=type=cache,target=/root/.m2 mvn clean test
